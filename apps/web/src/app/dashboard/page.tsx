@@ -508,7 +508,7 @@ export default function DashboardPage() {
 
           {activeTab === "logs" && (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
+              <table className="w-full min-w-180 text-sm">
                 <thead className="border-b border-slate-100 bg-slate-50">
                   <tr>
                     {["Waktu", "Satpam", "Checkpoint", "Status"].map(
