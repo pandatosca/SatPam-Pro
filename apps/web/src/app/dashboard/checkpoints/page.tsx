@@ -1,36 +1,58 @@
-'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface Checkpoint {
   id: number;
   name: string;
-  description: string;
-  checkpoint_code: string;
-  lat: number;
-  lng: number;
+  description?: string;
+  lat: string;
+  lng: string;
   radius_meters: number;
+  checkpoint_code: string;
   is_active: boolean;
+}
+const emptyForm = {
+  name: "",
+  description: "",
+  lat: "",
+  lng: "",
+  radius_meters: "50",
+  checkpoint_code: "",
+  maps_link: "",
+};
+
+function parseGoogleMapsLink(url: string): { lat: number; lng: number } | null {
+  try {
+    const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atMatch)
+      return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+    const qMatch = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (qMatch)
+      return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function qrImageUrl(code: string, origin: string) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${origin}/checkin/${code}`)}`;
 }
 
 function getToken() {
-  return typeof window !== 'undefined' ? localStorage.getItem('patrol_token') || '' : '';
-}
-function getUser() {
-  if (typeof window === 'undefined') return null;
-  const u = localStorage.getItem('patrol_user');
-  return u ? JSON.parse(u) : null;
+  return typeof window !== "undefined"
+    ? localStorage.getItem("patrol_token") || ""
+    : "";
 }
 
-const emptyForm = {
-  name: '',
-  description: '',
-  lat: '',
-  lng: '',
-  radius_meters: '50',
-  checkpoint_code: '',
-};
+function getUser() {
+  if (typeof window === "undefined") return null;
+  const user = localStorage.getItem("patrol_user");
+  return user ? JSON.parse(user) : null;
+}
 
 export default function CheckpointsPage() {
   const router = useRouter();
@@ -40,28 +62,21 @@ export default function CheckpointsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [origin, setOrigin] = useState('');
   const [selectedQR, setSelectedQR] = useState<Checkpoint | null>(null);
+  const [origin, setOrigin] = useState("");
 
   useEffect(() => {
     const u = getUser();
-    if (!u || u.role !== 'admin') {
-      router.push('/');
-      return;
-    }
-    setOrigin(window.location.origin);
+    if (!u || u.role !== "admin") router.push("/");
+    if (typeof window !== "undefined") setOrigin(window.location.origin);
   }, [router]);
 
   const fetchCheckpoints = useCallback(async () => {
-    const token = getToken();
     try {
-      const res = await fetch('/api/patrol/checkpoints', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch("/api/patrol/checkpoints", {
+        headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (res.ok) {
-        const d = await res.json();
-        setCheckpoints(d.checkpoints || []);
-      }
+      if (res.ok) setCheckpoints((await res.json()).checkpoints || []);
     } catch (err) {
       console.error(err);
     }
@@ -73,184 +88,255 @@ export default function CheckpointsPage() {
   }, [fetchCheckpoints]);
 
   const handleSave = async () => {
-    if (!form.name || !form.lat || !form.lng || !form.checkpoint_code) {
-      alert('Nama, Kode, Lat, dan Lng wajib diisi');
-      return;
-    }
-    setSaving(true);
-    const token = getToken();
-    try {
-      if (editId) {
-        await fetch('/api/patrol/checkpoints', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            id: editId,
-            ...form,
-            lat: parseFloat(form.lat),
-            lng: parseFloat(form.lng),
-            radius_meters: parseInt(form.radius_meters),
-            is_active: true,
-          }),
-        });
-      } else {
-        await fetch('/api/patrol/checkpoints', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            ...form,
-            lat: parseFloat(form.lat),
-            lng: parseFloat(form.lng),
-            radius_meters: parseInt(form.radius_meters),
-          }),
-        });
-      }
-      setForm(emptyForm);
-      setShowForm(false);
-      setEditId(null);
-      fetchCheckpoints();
-    } catch (err) {
-      console.error(err);
-      alert('Gagal menyimpan');
-    }
-    setSaving(false);
-  };
+    if (!form.name || !form.checkpoint_code)
+      return alert("Nama dan kode unik wajib diisi");
 
-  const startEdit = (cp: Checkpoint) => {
-    setForm({
-      name: cp.name,
-      description: cp.description || '',
-      lat: String(cp.lat),
-      lng: String(cp.lng),
-      radius_meters: String(cp.radius_meters),
-      checkpoint_code: cp.checkpoint_code,
-    });
-    setEditId(cp.id);
-    setShowForm(true);
-    setSelectedQR(null);
+    let lat = form.lat,
+      lng = form.lng;
+    if (form.maps_link && (!lat || !lng)) {
+      const coords = parseGoogleMapsLink(form.maps_link);
+      if (coords) {
+        lat = coords.lat.toString();
+        lng = coords.lng.toString();
+      } else return alert("Tidak bisa membaca koordinat dari link Google Maps");
+    }
+    if (!lat || !lng) return alert("Latitude dan Longitude wajib diisi");
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/patrol/checkpoints", {
+        method: editId ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify(
+          editId ? { id: editId, ...form, lat, lng } : { ...form, lat, lng },
+        ),
+      });
+      if (res.ok) {
+        setShowForm(false);
+        setForm(emptyForm);
+        setEditId(null);
+        fetchCheckpoints();
+      } else alert((await res.json()).error || "Gagal menyimpan");
+    } catch {
+      alert("Terjadi kesalahan");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleActive = async (cp: Checkpoint) => {
-    const token = getToken();
-    await fetch('/api/patrol/checkpoints', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ ...cp, is_active: !cp.is_active }),
+    await fetch("/api/patrol/checkpoints", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`,
+      },
+      body: JSON.stringify({
+        id: cp.id,
+        name: cp.name,
+        description: cp.description,
+        lat: cp.lat,
+        lng: cp.lng,
+        radius_meters: cp.radius_meters,
+        is_active: !cp.is_active,
+      }),
     });
     fetchCheckpoints();
   };
 
-  const qrImageUrl = (code: string) => {
-    const url = `${origin}/checkin/${code}`;
-    return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
+  const deleteCheckpoint = async (cp: Checkpoint) => {
+    if (!confirm(`Yakin ingin menonaktifkan ${cp.name}?`)) return;
+    await fetch("/api/patrol/checkpoints", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`,
+      },
+      body: JSON.stringify({ id: cp.id }),
+    });
+    fetchCheckpoints();
   };
 
-  const mapsLink = (lat: number, lng: number) => `https://www.google.com/maps?q=${lat},${lng}`;
+  const printAllQR = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const html = `
+      <!DOCTYPE html><html><head><title>QR Code Titik Patroli</title>
+      <style>
+        @page { size: A4; margin: 1cm; }
+        body { font-family: Arial, sans-serif; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2cm; }
+        .item { text-align: center; page-break-inside: avoid; border: 2px dashed #ccc; padding: 20px; }
+        .item img { width: 180px; height: 180px; }
+        .item h3 { margin: 15px 0 5px; font-size: 20px; }
+        .item p { margin: 0; font-size: 14px; color: #666; }
+      </style></head><body>
+      <h1 style="text-align: center; margin-bottom: 2cm;">QR Code Titik Patroli (Tempel di Lokasi)</h1>
+      <div class="grid">
+        ${checkpoints
+          .filter((cp) => cp.is_active)
+          .map(
+            (cp) => `
+          <div class="item">
+            <img src="${qrImageUrl(cp.checkpoint_code, origin)}" alt="${cp.checkpoint_code}" />
+            <h3>${cp.name}</h3>
+            <p>Kode: <strong>${cp.checkpoint_code}</strong></p>
+            <p>${Number(cp.lat).toFixed(5)}, ${Number(cp.lng).toFixed(5)}</p>
+          </div>
+        `,
+          )
+          .join("")}
+      </div></body></html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  };
 
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-500">Memuat...</p>
+        <p className="text-gray-500 text-lg">Memuat...</p>
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <header className="bg-blue-900 text-white shadow-lg">
+      <header className="bg-green-900 text-white shadow-lg print:hidden">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-blue-300 hover:text-white text-sm">
+            <Link
+              href="/dashboard"
+              className="text-green-300 hover:text-white text-base"
+            >
               ← Dashboard
             </Link>
-            <span className="text-blue-500">/</span>
-            <h1 className="text-lg font-bold">Titik Patroli</h1>
+            <span className="text-green-500">/</span>
+            <h1 className="text-xl font-bold">Titik Patroli</h1>
           </div>
-          <button
-            onClick={() => {
-              setForm(emptyForm);
-              setEditId(null);
-              setShowForm(true);
-              setSelectedQR(null);
-            }}
-            className="bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded-lg font-medium"
-          >
-            + Tambah Titik
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={printAllQR}
+              className="bg-white text-green-700 text-base px-5 py-3 rounded-lg font-medium hover:bg-green-50"
+            >
+              🖨️ Cetak Semua QR
+            </button>
+            <button
+              onClick={() => {
+                setForm(emptyForm);
+                setEditId(null);
+                setShowForm(true);
+                setSelectedQR(null);
+              }}
+              className="bg-green-600 hover:bg-green-500 text-white text-base px-5 py-3 rounded-lg font-medium"
+            >
+              + Tambah Titik
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        {/* Form tambah/edit */}
         {showForm && (
-          <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-6">
-            <h2 className="font-semibold text-gray-800 mb-4">
-              {editId ? 'Edit Titik Patroli' : 'Tambah Titik Patroli Baru'}
+          <div className="bg-white rounded-xl shadow-sm border-2 border-green-200 p-6 print:hidden">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              {editId ? "Edit Titik Patroli" : "Tambah Titik Patroli Baru"}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm text-gray-600 font-medium block mb-1">Nama Titik *</label>
+                <label className="text-base text-gray-600 font-medium block mb-2">
+                  Nama Titik *
+                </label>
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Contoh: Pos Utama / Gerbang"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 font-medium block mb-1">
+                <label className="text-base text-gray-600 font-medium block mb-2">
                   Kode Unik * (untuk QR)
                 </label>
                 <input
                   value={form.checkpoint_code}
                   onChange={(e) =>
-                    setForm({ ...form, checkpoint_code: e.target.value.toUpperCase() })
+                    setForm({
+                      ...form,
+                      checkpoint_code: e.target.value.toUpperCase(),
+                    })
                   }
-                  placeholder="Contoh: CP007"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
                   maxLength={10}
+                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base font-mono focus:outline-none focus:ring-2 focus:ring-green-500 uppercase"
                 />
               </div>
+              <div className="md:col-span-2">
+                <label className="text-base text-gray-600 font-medium block mb-2">
+                  🗺️ Link Google Maps (Auto-fill Lat/Lng)
+                </label>
+                <input
+                  value={form.maps_link}
+                  onChange={(e) =>
+                    setForm({ ...form, maps_link: e.target.value })
+                  }
+                  placeholder="Paste link Google Maps di sini..."
+                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  💡 Paste link, koordinat akan otomatis terisi
+                </p>
+              </div>
               <div>
-                <label className="text-sm text-gray-600 font-medium block mb-1">Latitude *</label>
+                <label className="text-base text-gray-600 font-medium block mb-2">
+                  Latitude *
+                </label>
                 <input
                   type="number"
                   step="any"
                   value={form.lat}
                   onChange={(e) => setForm({ ...form, lat: e.target.value })}
-                  placeholder="-6.2088"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 font-medium block mb-1">Longitude *</label>
+                <label className="text-base text-gray-600 font-medium block mb-2">
+                  Longitude *
+                </label>
                 <input
                   type="number"
                   step="any"
                   value={form.lng}
                   onChange={(e) => setForm({ ...form, lng: e.target.value })}
-                  placeholder="106.8456"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 font-medium block mb-1">
+                <label className="text-base text-gray-600 font-medium block mb-2">
                   Radius Valid (meter)
                 </label>
                 <input
                   type="number"
                   value={form.radius_meters}
-                  onChange={(e) => setForm({ ...form, radius_meters: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) =>
+                    setForm({ ...form, radius_meters: e.target.value })
+                  }
+                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 font-medium block mb-1">Keterangan</label>
+                <label className="text-base text-gray-600 font-medium block mb-2">
+                  Keterangan
+                </label>
                 <input
                   value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Deskripsi lokasi..."
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
+                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
             </div>
@@ -258,9 +344,9 @@ export default function CheckpointsPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:bg-blue-400"
+                className="bg-green-600 hover:bg-green-700 text-white text-base px-6 py-3 rounded-lg font-medium disabled:bg-green-400"
               >
-                {saving ? 'Menyimpan...' : '💾 Simpan'}
+                {saving ? "Menyimpan..." : "💾 Simpan"}
               </button>
               <button
                 onClick={() => {
@@ -268,7 +354,7 @@ export default function CheckpointsPage() {
                   setEditId(null);
                   setForm(emptyForm);
                 }}
-                className="border border-gray-300 text-gray-600 px-6 py-2 rounded-lg text-sm hover:bg-gray-50"
+                className="border-2 border-gray-300 text-gray-600 text-base px-6 py-3 rounded-lg hover:bg-gray-50"
               >
                 Batal
               </button>
@@ -276,97 +362,89 @@ export default function CheckpointsPage() {
           </div>
         )}
 
-        {/* QR Modal */}
-        {selectedQR && origin && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl">
-              <h3 className="font-bold text-gray-800 text-lg mb-1">{selectedQR.name}</h3>
-              <p className="text-gray-500 text-sm mb-4">{selectedQR.description}</p>
-              <div className="inline-block bg-blue-900 text-white font-mono font-bold px-4 py-1.5 rounded-full mb-4">
-                {selectedQR.checkpoint_code}
-              </div>
-              <img
-                src={qrImageUrl(selectedQR.checkpoint_code)}
-                alt="QR Code"
-                className="mx-auto rounded-lg mb-4 border border-gray-200"
-              />
-              <p className="text-xs text-gray-400 mb-4 break-all">
-                {origin}/checkin/{selectedQR.checkpoint_code}
-              </p>
-              <p className="text-xs text-blue-600 bg-blue-50 rounded-lg p-2 mb-4">
-                📌 Print QR ini dan tempel di titik patroli. Satpam scan dengan kamera HP.
-              </p>
-              <button
-                onClick={() => setSelectedQR(null)}
-                className="w-full border border-gray-300 text-gray-600 py-2 rounded-lg hover:bg-gray-50"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* List checkpoints */}
         <div className="grid gap-4">
           {checkpoints.map((cp) => (
             <div
               key={cp.id}
-              className={`bg-white rounded-xl shadow-sm border p-5 ${cp.is_active ? 'border-gray-100' : 'border-gray-200 opacity-60'}`}
+              className={`bg-white rounded-xl shadow-sm border-2 p-5 ${cp.is_active ? "border-gray-100" : "border-gray-200 opacity-60"}`}
             >
               <div className="flex items-start gap-4">
                 {origin && (
                   <img
-                    src={qrImageUrl(cp.checkpoint_code)}
+                    src={qrImageUrl(cp.checkpoint_code, origin)}
                     alt={cp.checkpoint_code}
-                    className="w-20 h-20 rounded-lg border border-gray-200 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                    className="w-24 h-24 rounded-lg border-2 border-gray-200 shrink-0 cursor-pointer hover:opacity-80"
                     onClick={() => setSelectedQR(cp)}
                   />
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-gray-800">{cp.name}</h3>
+                    <h3 className="font-semibold text-gray-800 text-lg">
+                      {cp.name}
+                    </h3>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${cp.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                      className={`text-sm px-2 py-1 rounded-full font-medium ${cp.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
                     >
-                      {cp.is_active ? 'Aktif' : 'Nonaktif'}
+                      {cp.is_active ? "Aktif" : "Nonaktif"}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{cp.description}</p>
+                  <p className="text-sm text-gray-400 mt-1">{cp.description}</p>
                   <div className="flex flex-wrap items-center gap-3 mt-2">
-                    <span className="font-mono text-sm font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded">
+                    <span className="font-mono text-base font-bold text-green-700 bg-green-50 px-3 py-1 rounded">
                       {cp.checkpoint_code}
                     </span>
-                    <span className="text-xs text-gray-500">
-                      📍 {Number(cp.lat).toFixed(5)}, {Number(cp.lng).toFixed(5)}
+                    <span className="text-sm text-gray-500">
+                      📍 {Number(cp.lat).toFixed(5)},{" "}
+                      {Number(cp.lng).toFixed(5)}
                     </span>
-                    <span className="text-xs text-gray-500">Radius: {cp.radius_meters}m</span>
+                    <span className="text-sm text-gray-500">
+                      Radius: {cp.radius_meters}m
+                    </span>
                   </div>
                   <div className="flex gap-2 mt-3 flex-wrap">
                     <button
                       onClick={() => setSelectedQR(cp)}
-                      className="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-100 font-medium"
+                      className="text-base bg-green-50 text-green-700 px-4 py-2 rounded-lg hover:bg-green-100 font-medium"
                     >
-                      🔲 Lihat QR
+                      🔲 QR
                     </button>
                     <a
-                      href={mapsLink(cp.lat, cp.lng)}
+                      href={`https://www.google.com/maps?q=${cp.lat},${cp.lng}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs bg-green-50 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-100 font-medium"
+                      className="text-base bg-green-50 text-green-700 px-4 py-2 rounded-lg hover:bg-green-100 font-medium"
                     >
                       🗺️ Maps
                     </a>
                     <button
-                      onClick={() => startEdit(cp)}
-                      className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-100 font-medium"
+                      onClick={() => {
+                        setForm({
+                          name: cp.name,
+                          description: cp.description || "",
+                          lat: cp.lat,
+                          lng: cp.lng,
+                          radius_meters: cp.radius_meters.toString(),
+                          checkpoint_code: cp.checkpoint_code,
+                          maps_link: "",
+                        });
+                        setEditId(cp.id);
+                        setShowForm(true);
+                      }}
+                      className="text-base bg-green-50 text-green-700 px-4 py-2 rounded-lg hover:bg-green-100 font-medium"
                     >
                       ✏️ Edit
                     </button>
                     <button
                       onClick={() => toggleActive(cp)}
-                      className={`text-xs px-3 py-1.5 rounded-lg font-medium ${cp.is_active ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
+                      className={`text-base px-4 py-2 rounded-lg font-medium ${cp.is_active ? "bg-yellow-50 text-yellow-700 hover:bg-yellow-100" : "bg-green-50 text-green-700 hover:bg-green-100"}`}
                     >
-                      {cp.is_active ? '⏸ Nonaktifkan' : '▶ Aktifkan'}
+                      {cp.is_active ? "⏸" : "▶"}
+                    </button>
+                    <button
+                      onClick={() => deleteCheckpoint(cp)}
+                      className="text-base bg-red-50 text-red-700 px-4 py-2 rounded-lg hover:bg-red-100 font-medium"
+                    >
+                      🗑️
                     </button>
                   </div>
                 </div>
@@ -375,14 +453,47 @@ export default function CheckpointsPage() {
           ))}
           {checkpoints.length === 0 && (
             <div className="bg-white rounded-xl p-10 text-center">
-              <p className="text-4xl mb-3">📍</p>
-              <p className="text-gray-500">
-                Belum ada titik patroli. Klik Tambah Titik untuk mulai.
-              </p>
+              <p className="text-5xl mb-3">📍</p>
+              <p className="text-gray-500 text-lg">Belum ada titik patroli.</p>
             </div>
           )}
         </div>
       </div>
+
+      {selectedQR && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 print:hidden"
+          onClick={() => setSelectedQR(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-8 max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">
+              {selectedQR.name}
+            </h3>
+            <div className="flex justify-center mb-4">
+              <img
+                src={qrImageUrl(selectedQR.checkpoint_code, origin)}
+                alt={selectedQR.checkpoint_code}
+                className="w-64 h-64"
+              />
+            </div>
+            <p className="text-center text-gray-600 mb-2">
+              Kode:{" "}
+              <span className="font-mono font-bold">
+                {selectedQR.checkpoint_code}
+              </span>
+            </p>
+            <button
+              onClick={() => setSelectedQR(null)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-3 rounded-lg font-medium mt-4"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

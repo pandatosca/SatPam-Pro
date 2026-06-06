@@ -1,42 +1,74 @@
-import sql from '@/app/api/utils/sql';
-import * as argon2 from 'argon2';
-import crypto from 'crypto';
+import sql from "@/app/api/utils/sql";
+import crypto from "crypto";
+
+const MAX_ATTEMPTS = 5;
+const LOCK_DURATION = 15 * 60 * 1000; // 15 menit
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json();
-    if (!username || !password) {
-      return Response.json({ error: 'Username dan password wajib diisi' }, { status: 400 });
+    const { username, pin } = await request.json();
+
+    if (!username || !pin) {
+      return Response.json(
+        { error: "Username dan PIN wajib diisi" },
+        { status: 400 },
+      );
+    }
+
+    if (!/^\d{6}$/.test(pin)) {
+      return Response.json(
+        { error: "PIN harus 6 digit angka" },
+        { status: 400 },
+      );
     }
 
     const rows = await sql`
-      SELECT id, name, username, password_hash, role, phone
+      SELECT id, name, username, pin, role, phone, failed_attempts, locked_until
       FROM users WHERE username = ${username} AND is_active = true LIMIT 1
     `;
 
     if (!rows.length) {
-      return Response.json({ error: 'Username atau password salah' }, { status: 401 });
+      return Response.json(
+        { error: "Username atau PIN salah" },
+        { status: 401 },
+      );
     }
 
     const user = rows[0];
-    let valid = false;
-    try {
-      valid = await argon2.verify(user.password_hash, password);
-    } catch {
-      valid = password === 'password123';
+
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      const remainingMin = Math.ceil(
+        (new Date(user.locked_until).getTime() - Date.now()) / 60000,
+      );
+      return Response.json(
+        { error: `Akun terkunci. Coba lagi dalam ${remainingMin} menit` },
+        { status: 423 },
+      );
     }
 
-    if (!valid) {
-      return Response.json({ error: 'Username atau password salah' }, { status: 401 });
+    if (user.pin !== pin) {
+      const newAttempts = (user.failed_attempts || 0) + 1;
+      if (newAttempts >= MAX_ATTEMPTS) {
+        const lockedUntil = new Date(Date.now() + LOCK_DURATION);
+        await sql`UPDATE users SET failed_attempts = ${newAttempts}, locked_until = ${lockedUntil.toISOString()} WHERE id = ${user.id}`;
+        return Response.json(
+          { error: `PIN salah ${MAX_ATTEMPTS}x. Akun terkunci 15 menit` },
+          { status: 423 },
+        );
+      }
+      await sql`UPDATE users SET failed_attempts = ${newAttempts} WHERE id = ${user.id}`;
+      return Response.json(
+        { error: `PIN salah. Sisa ${MAX_ATTEMPTS - newAttempts} percobaan` },
+        { status: 401 },
+      );
     }
 
-    const token = crypto.randomUUID() + '-' + crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000 * 7);
+    await sql`UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ${user.id}`;
 
-    await sql`
-      INSERT INTO sessions (token, user_id, expires_at)
-      VALUES (${token}, ${user.id}, ${expiresAt.toISOString()})
-    `;
+    const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await sql`INSERT INTO sessions (token, user_id, expires_at) VALUES (${token}, ${user.id}, ${expiresAt.toISOString()})`;
 
     return Response.json({
       token,
@@ -50,6 +82,6 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error(err);
-    return Response.json({ error: 'Server error' }, { status: 500 });
+    return Response.json({ error: "Server error" }, { status: 500 });
   }
 }

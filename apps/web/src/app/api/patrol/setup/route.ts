@@ -1,14 +1,24 @@
-import sql from '@/app/api/utils/sql';
-import * as argon2 from 'argon2';
+import sql from "@/app/api/utils/sql";
 
-// One-time setup: hash default password for all seeded users
 export async function POST() {
   try {
-    const hash = await argon2.hash('password123');
-    await sql`UPDATE users SET password_hash = ${hash} WHERE password_hash LIKE '$argon2id%'`;
-    return Response.json({ ok: true, message: 'Password reset ke password123 untuk semua user' });
+    const users =
+      await sql`SELECT id, username FROM users WHERE pin IS NULL OR pin = ''`;
+    const results = [];
+
+    for (const user of users) {
+      const pin = Math.floor(100000 + Math.random() * 900000).toString();
+      await sql`UPDATE users SET pin = ${pin}, failed_attempts = 0 WHERE id = ${user.id}`;
+      results.push({ username: user.username, pin });
+    }
+
+    return Response.json({
+      ok: true,
+      message: `PIN di-generate untuk ${results.length} user`,
+      users: results,
+    });
   } catch (err) {
     console.error(err);
-    return Response.json({ error: 'Server error' }, { status: 500 });
+    return Response.json({ error: "Server error" }, { status: 500 });
   }
 }
