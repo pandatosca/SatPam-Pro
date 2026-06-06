@@ -60,7 +60,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-full shadow-lg mb-4">
-            <span className="text-5xl">🛡️</span>a{" "}
+            <span className="text-5xl">🛡️</span>
           </div>
           <h1 className="text-4xl font-bold text-white">SatPam Pro</h1>
           <p className="text-green-200 mt-2 text-lg">
@@ -168,3 +168,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
