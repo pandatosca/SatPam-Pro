@@ -256,7 +256,7 @@ export default function DashboardPage() {
             )}
             <Link
               href="/dashboard/checkpoints"
-              className="hidden md:block text-green-200 hover:text-white text-sm"
+              className="hidden md:block text-green-200 hover:text-white text-base"
             >
               📍 Checkpoint
             </Link>
