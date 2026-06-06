@@ -2,7 +2,6 @@ import sql from "@/app/api/utils/sql";
 
 export async function GET() {
   try {
-    // 1. Buat tabel users
     await sql`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -17,12 +16,9 @@ export async function GET() {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `;
-
-    // 2. Tambah kolom yang mungkin belum ada
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)`;
 
-    // 3. Buat tabel sessions
     await sql`
       CREATE TABLE IF NOT EXISTS sessions (
         id SERIAL PRIMARY KEY,
@@ -33,18 +29,41 @@ export async function GET() {
       )
     `;
 
-    // 4. Buat tabel checkpoints
     await sql`
       CREATE TABLE IF NOT EXISTS checkpoints (
         id SERIAL PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         checkpoint_code VARCHAR(50) UNIQUE NOT NULL,
         location VARCHAR(200),
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await sql`ALTER TABLE checkpoints ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS patrol_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        checkpoint_id INTEGER REFERENCES checkpoints(id),
+        checked_at TIMESTAMP DEFAULT NOW(),
+        is_valid BOOLEAN DEFAULT true,
+        notes TEXT
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS sos_alerts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        lat DECIMAL(10,7),
+        lng DECIMAL(10,7),
+        message TEXT,
+        is_resolved BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `;
 
-    // 5. Buat tabel patrols
     await sql`
       CREATE TABLE IF NOT EXISTS patrols (
         id SERIAL PRIMARY KEY,
@@ -55,18 +74,6 @@ export async function GET() {
       )
     `;
 
-    // 6. Buat tabel patrol_checkpoints
-    await sql`
-      CREATE TABLE IF NOT EXISTS patrol_checkpoints (
-        id SERIAL PRIMARY KEY,
-        patrol_id INTEGER REFERENCES patrols(id),
-        checkpoint_id INTEGER REFERENCES checkpoints(id),
-        scanned_at TIMESTAMP DEFAULT NOW(),
-        notes TEXT
-      )
-    `;
-
-    // 7. Insert admin default
     await sql`
       INSERT INTO users (username, name, role, pin, is_active)
       VALUES ('admin', 'Administrator', 'admin', '123456', true)
@@ -75,7 +82,7 @@ export async function GET() {
 
     return Response.json({
       success: true,
-      message: "✅ Database berhasil di-setup!",
+      message: "✅ Database berhasil di-setup lengkap!",
     });
   } catch (error: any) {
     return Response.json(
