@@ -1,7 +1,24 @@
 "use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  KeyRound,
+  Loader2,
+  LogOut,
+  MapPin,
+  RefreshCw,
+  ShieldCheck,
+  Siren,
+  UsersRound,
+} from "lucide-react";
 
 interface GuardActivity {
   id: number;
@@ -10,6 +27,7 @@ interface GuardActivity {
   valid_count: number;
   last_checkin: string | null;
 }
+
 interface Stats {
   today: { total: number; valid: number };
   guards: number;
@@ -17,6 +35,7 @@ interface Stats {
   sos: number;
   guardActivity: GuardActivity[];
 }
+
 interface Log {
   id: number;
   guard_name: string;
@@ -29,6 +48,7 @@ interface Log {
   is_valid: boolean;
   notes: string;
 }
+
 interface SosAlert {
   id: number;
   guard_name: string;
@@ -44,10 +64,11 @@ function getToken() {
     ? localStorage.getItem("patrol_token") || ""
     : "";
 }
+
 function getUser() {
   if (typeof window === "undefined") return null;
-  const u = localStorage.getItem("patrol_user");
-  return u ? JSON.parse(u) : null;
+  const user = localStorage.getItem("patrol_user");
+  return user ? JSON.parse(user) : null;
 }
 
 export default function DashboardPage() {
@@ -86,6 +107,7 @@ export default function DashboardPage() {
         router.push("/");
         return;
       }
+
       try {
         const [statsRes, logsRes, sosRes] = await Promise.all([
           fetch(`/api/patrol/stats?date=${date}`, {
@@ -98,30 +120,32 @@ export default function DashboardPage() {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
+
         if (statsRes.ok) setStats(await statsRes.json());
         if (logsRes.ok) {
-          const d = await logsRes.json();
-          setLogs(d.logs || []);
+          const data = await logsRes.json();
+          setLogs(data.logs || []);
         }
         if (sosRes.ok) {
-          const d = await sosRes.json();
-          setSosAlerts(d.alerts || []);
+          const data = await sosRes.json();
+          setSosAlerts(data.alerts || []);
         }
       } catch (err) {
         console.error(err);
       }
+
       setLoading(false);
     },
     [router],
   );
 
   useEffect(() => {
-    const u = getUser();
-    if (!u || u.role !== "admin") {
+    const activeUser = getUser();
+    if (!activeUser || activeUser.role !== "admin") {
       router.push("/");
       return;
     }
-    setUser(u);
+    setUser(activeUser);
   }, [router]);
 
   useEffect(() => {
@@ -160,6 +184,7 @@ export default function DashboardPage() {
       setPinMsg("Konfirmasi PIN tidak cocok");
       return;
     }
+
     setPinLoading(true);
     try {
       const token = getToken();
@@ -176,7 +201,7 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setPinMsg("✅ PIN berhasil diganti!");
+        setPinMsg("PIN berhasil diganti");
         setTimeout(() => {
           setShowPinModal(false);
           setPinForm({ oldPin: "", newPin: "", confirmPin: "" });
@@ -193,13 +218,14 @@ export default function DashboardPage() {
 
   const formatTime = (isoStr: string) => {
     if (!isoStr) return "--:--";
-    const m = isoStr.match(/T(\d{2}):(\d{2})/);
-    return m ? `${m[1]}:${m[2]}` : "--:--";
+    const match = isoStr.match(/T(\d{2}):(\d{2})/);
+    return match ? `${match[1]}:${match[2]}` : "--:--";
   };
+
   const formatDateTime = (isoStr: string) => {
     if (!isoStr) return "--";
-    const m = isoStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-    if (!m) return "--";
+    const match = isoStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!match) return "--";
     const months = [
       "",
       "Jan",
@@ -215,69 +241,114 @@ export default function DashboardPage() {
       "Nov",
       "Des",
     ];
-    return `${m[3]} ${months[parseInt(m[2])]} ${m[4]}:${m[5]}`;
+    return `${match[3]} ${months[parseInt(match[2])]} ${match[4]}:${match[5]}`;
   };
 
-  const pendingSos = sosAlerts.filter((s) => !s.is_resolved);
+  const pendingSos = sosAlerts.filter((sos) => !sos.is_resolved);
+  const statCards = [
+    {
+      label: "Check-in",
+      value: stats?.today.total || 0,
+      sub: `${stats?.today.valid || 0} valid`,
+      icon: CheckCircle2,
+      color: "text-emerald-700",
+      iconBg: "bg-emerald-100",
+      border: "border-emerald-100",
+    },
+    {
+      label: "Satpam",
+      value: stats?.guards || 0,
+      sub: "Aktif",
+      icon: UsersRound,
+      color: "text-blue-700",
+      iconBg: "bg-blue-100",
+      border: "border-blue-100",
+    },
+    {
+      label: "Checkpoint",
+      value: stats?.checkpoints || 0,
+      sub: "Titik patroli",
+      icon: MapPin,
+      color: "text-violet-700",
+      iconBg: "bg-violet-100",
+      border: "border-violet-100",
+    },
+    {
+      label: "SOS Alert",
+      value: stats?.sos || 0,
+      sub: "Belum selesai",
+      icon: Siren,
+      color: (stats?.sos || 0) > 0 ? "text-red-600" : "text-slate-500",
+      iconBg: (stats?.sos || 0) > 0 ? "bg-red-100" : "bg-slate-100",
+      border: (stats?.sos || 0) > 0 ? "border-red-100" : "border-slate-100",
+    },
+  ];
 
   if (loading && !selectedDate) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
-          <div className="text-4xl mb-3">⏳</div>
-          <p className="text-gray-500">Memuat data...</p>
+          <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-green-700" />
+          <p className="text-slate-500">Memuat data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-green-800 text-white shadow-lg sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🛡️</span>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-10 border-b border-green-700 bg-green-800 text-white shadow-sm">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
+              <ShieldCheck className="h-6 w-6 text-emerald-100" />
+            </div>
             <div>
-              <h1 className="text-base font-bold leading-tight">SatPam Pro</h1>
-              <p className="text-green-300 text-xs">Dashboard Admin</p>
+              <h1 className="text-lg font-bold leading-tight">SatPam Pro</h1>
+              <p className="text-sm text-green-100/80">Dashboard Admin</p>
             </div>
           </div>
-          {/* Nav kanan */}
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-2 sm:gap-3">
             {pendingSos.length > 0 && (
               <button
                 onClick={() => setActiveTab("sos")}
-                className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full animate-pulse"
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-red-500 px-3 text-sm font-semibold text-white shadow-sm hover:bg-red-600"
               >
-                🚨 {pendingSos.length}
+                <Siren className="h-4 w-4" />
+                {pendingSos.length}
               </button>
             )}
             <Link
               href="/dashboard/checkpoints"
-              className="hidden md:block text-green-200 hover:text-white text-base"
+              className="hidden min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-green-50/90 hover:bg-white/10 hover:text-white md:inline-flex"
             >
-              📍 Checkpoint
+              <MapPin className="h-4 w-4" />
+              Checkpoint
             </Link>
             <Link
               href="/dashboard/guards"
-              className="hidden md:block text-green-200 hover:text-white text-sm"
+              className="hidden min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-green-50/90 hover:bg-white/10 hover:text-white md:inline-flex"
             >
-              👮 Satpam
+              <UsersRound className="h-4 w-4" />
+              Satpam
             </Link>
             <button
               onClick={() => setShowPinModal(true)}
-              className="bg-green-700 hover:bg-green-600 text-white text-xs px-2.5 py-1.5 rounded-lg border border-green-600"
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-medium text-white hover:bg-white/15"
             >
-              🔑 PIN
+              <KeyRound className="h-4 w-4" />
+              PIN
             </button>
-            <div className="text-right">
-              <p className="text-sm font-medium leading-tight">{user?.name}</p>
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-semibold leading-tight">
+                {user?.name || "Administrator"}
+              </p>
               <button
                 onClick={logout}
-                className="text-green-300 hover:text-white text-xs"
+                className="inline-flex min-h-0 items-center gap-1 text-xs text-green-100/75 hover:text-white"
               >
+                <LogOut className="h-3 w-3" />
                 Keluar
               </button>
             </div>
@@ -285,129 +356,151 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
-        {/* Date filter */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <h2 className="text-lg font-bold text-gray-800">Laporan Patroli</h2>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="flex-1 sm:flex-none border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+      <main className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:py-8">
+        <section className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <p className="text-sm font-medium text-green-700">Ringkasan</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+              Laporan Patroli
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Pantau check-in, aktivitas satpam, dan laporan SOS harian.
+            </p>
+          </div>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <label className="relative block flex-1 sm:w-48">
+              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm text-slate-800 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+              />
+            </label>
             <button
               onClick={() => fetchAll(selectedDate)}
-              className="bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-green-800 whitespace-nowrap"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-green-800"
             >
-              🔄 Refresh
+              <RefreshCw className="h-4 w-4" />
+              Refresh
             </button>
           </div>
-        </div>
+        </section>
 
-        {/* Stats cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            {
-              label: "Check-in",
-              value: stats?.today.total || 0,
-              sub: `${stats?.today.valid || 0} valid`,
-              color: "text-green-700",
-              bg: "bg-green-50",
-            },
-            {
-              label: "Satpam",
-              value: stats?.guards || 0,
-              sub: "Aktif",
-              color: "text-blue-700",
-              bg: "bg-blue-50",
-            },
-            {
-              label: "Checkpoint",
-              value: stats?.checkpoints || 0,
-              sub: "Titik patroli",
-              color: "text-purple-700",
-              bg: "bg-purple-50",
-            },
-            {
-              label: "SOS Alert",
-              value: stats?.sos || 0,
-              sub: "Belum selesai",
-              color: (stats?.sos || 0) > 0 ? "text-red-600" : "text-gray-400",
-              bg: (stats?.sos || 0) > 0 ? "bg-red-50" : "bg-gray-50",
-            },
-          ].map((c) => (
-            <div
-              key={c.label}
-              className={`${c.bg} rounded-xl p-4 border border-white shadow-sm`}
-            >
-              <p className="text-xs text-gray-500 font-medium mb-1">
-                {c.label}
-              </p>
-              <p className={`text-3xl font-bold ${c.color}`}>{c.value}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{c.sub}</p>
-            </div>
-          ))}
-        </div>
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {statCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div
+                key={card.label}
+                className={`rounded-2xl border ${card.border} bg-white p-4 shadow-sm`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">
+                      {card.label}
+                    </p>
+                    <p className={`mt-3 text-3xl font-bold ${card.color}`}>
+                      {card.value}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-400">{card.sub}</p>
+                  </div>
+                  <div className={`rounded-xl p-2.5 ${card.iconBg}`}>
+                    <Icon className={`h-5 w-5 ${card.color}`} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </section>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="flex border-b border-gray-100">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="grid grid-cols-3 border-b border-slate-100 bg-slate-50/70 p-1.5">
             {(["overview", "logs", "sos"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2.5 text-xs sm:text-sm font-medium transition-colors ${activeTab === tab ? "bg-green-50 text-green-800 border-b-2 border-green-700" : "text-gray-500 hover:text-gray-700"}`}
+                className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-colors ${
+                  activeTab === tab
+                    ? "bg-white text-green-800 shadow-sm ring-1 ring-slate-200"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
               >
-                {tab === "overview" && "📊 Aktivitas"}
-                {tab === "logs" && `📋 Log (${logs.length})`}
-                {tab === "sos" && `🚨 SOS (${pendingSos.length})`}
+                {tab === "overview" && (
+                  <>
+                    <BarChart3 className="h-4 w-4" />
+                    Aktivitas
+                  </>
+                )}
+                {tab === "logs" && (
+                  <>
+                    <ClipboardList className="h-4 w-4" />
+                    Log ({logs.length})
+                  </>
+                )}
+                {tab === "sos" && (
+                  <>
+                    <Siren className="h-4 w-4" />
+                    SOS ({pendingSos.length})
+                  </>
+                )}
               </button>
             ))}
           </div>
 
           {activeTab === "overview" && (
-            <div className="p-3 sm:p-4">
-              <div className="grid gap-2">
-                {(stats?.guardActivity || []).map((g) => (
+            <div className="p-4 sm:p-5">
+              <div className="grid gap-3">
+                {(stats?.guardActivity || []).map((guard) => (
                   <div
-                    key={g.id}
-                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100"
+                    key={guard.id}
+                    className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3"
                   >
-                    <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center text-green-800 font-bold text-sm shrink-0">
-                      {g.name.charAt(0)}
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-100 text-sm font-bold text-green-800">
+                      {guard.name.charAt(0)}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-800 text-sm truncate">
-                        {g.name}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">
+                        {guard.name}
                       </p>
                       <p
-                        className="text-xs text-gray-400"
+                        className="mt-0.5 inline-flex items-center gap-1 text-xs text-slate-400"
                         suppressHydrationWarning
                       >
-                        {g.last_checkin
-                          ? formatTime(g.last_checkin)
+                        <Activity className="h-3 w-3" />
+                        {guard.last_checkin
+                          ? formatTime(guard.last_checkin)
                           : "Belum patroli"}
                       </p>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="shrink-0 text-right">
                       <p className="text-lg font-bold text-green-700">
-                        {g.checkin_count}
+                        {guard.checkin_count}
                       </p>
-                      <p className="text-xs text-gray-400">
-                        {g.valid_count} valid
+                      <p className="text-xs text-slate-400">
+                        {guard.valid_count} valid
                       </p>
                     </div>
                     <div
-                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${g.checkin_count > 0 ? "bg-green-400" : "bg-gray-300"}`}
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                        guard.checkin_count > 0
+                          ? "bg-green-400"
+                          : "bg-slate-300"
+                      }`}
                     />
                   </div>
                 ))}
                 {(!stats?.guardActivity ||
                   stats.guardActivity.length === 0) && (
-                  <p className="text-center text-gray-400 py-8 text-sm">
-                    Belum ada data untuk tanggal ini
-                  </p>
+                  <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center">
+                    <BarChart3 className="mb-3 h-8 w-8 text-slate-300" />
+                    <p className="font-medium text-slate-500">
+                      Belum ada aktivitas
+                    </p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Data patroli untuk tanggal ini akan muncul di sini.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -415,44 +508,55 @@ export default function DashboardPage() {
 
           {activeTab === "logs" && (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-125">
-                <thead className="bg-gray-50 border-b border-gray-100">
+              <table className="w-full min-w-[720px] text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50">
                   <tr>
-                    {["Waktu", "Satpam", "Checkpoint", "Status"].map((h) => (
-                      <th
-                        key={h}
-                        className="text-left px-3 py-2.5 text-xs text-gray-500 font-medium"
-                      >
-                        {h}
-                      </th>
-                    ))}
+                    {["Waktu", "Satpam", "Checkpoint", "Status"].map(
+                      (heading) => (
+                        <th
+                          key={heading}
+                          className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
+                        >
+                          {heading}
+                        </th>
+                      ),
+                    )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-slate-100">
                   {logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50">
+                    <tr key={log.id} className="hover:bg-slate-50">
                       <td
-                        className="px-3 py-2.5 text-gray-500 text-xs whitespace-nowrap"
+                        className="whitespace-nowrap px-4 py-3 text-xs text-slate-500"
                         suppressHydrationWarning
                       >
                         {formatDateTime(log.checked_at)}
                       </td>
-                      <td className="px-3 py-2.5 font-medium text-gray-800 text-xs">
+                      <td className="px-4 py-3 text-xs font-semibold text-slate-800">
                         {log.guard_name}
                       </td>
-                      <td className="px-3 py-2.5 text-xs">
-                        <span className="text-gray-800">
+                      <td className="px-4 py-3 text-xs">
+                        <span className="text-slate-800">
                           {log.checkpoint_name}
                         </span>
-                        <span className="ml-1 text-gray-400">
+                        <span className="ml-1 text-slate-400">
                           ({log.checkpoint_code})
                         </span>
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-4 py-3">
                         <span
-                          className={`inline-flex text-xs font-medium px-2 py-0.5 rounded-full ${log.is_valid ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            log.is_valid
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
                         >
-                          {log.is_valid ? "✓ Valid" : "✗ Invalid"}
+                          {log.is_valid ? (
+                            <CheckCircle2 className="h-3 w-3" />
+                          ) : (
+                            <AlertTriangle className="h-3 w-3" />
+                          )}
+                          {log.is_valid ? "Valid" : "Invalid"}
                         </span>
                       </td>
                     </tr>
@@ -461,9 +565,9 @@ export default function DashboardPage() {
                     <tr>
                       <td
                         colSpan={4}
-                        className="text-center py-10 text-gray-400 text-sm"
+                        className="px-4 py-14 text-center text-sm text-slate-400"
                       >
-                        Tidak ada log untuk tanggal ini
+                        Tidak ada log untuk tanggal ini.
                       </td>
                     </tr>
                   )}
@@ -473,24 +577,38 @@ export default function DashboardPage() {
           )}
 
           {activeTab === "sos" && (
-            <div className="p-3 sm:p-4 space-y-2">
+            <div className="space-y-3 p-4 sm:p-5">
               {sosAlerts.map((sos) => (
                 <div
                   key={sos.id}
-                  className={`p-3 rounded-lg border flex items-start gap-3 ${sos.is_resolved ? "bg-gray-50 border-gray-200 opacity-60" : "bg-red-50 border-red-200"}`}
+                  className={`flex items-start gap-3 rounded-xl border p-4 ${
+                    sos.is_resolved
+                      ? "border-slate-200 bg-slate-50 opacity-70"
+                      : "border-red-200 bg-red-50"
+                  }`}
                 >
-                  <span className="text-xl">
-                    {sos.is_resolved ? "✅" : "🚨"}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800 text-sm">
+                  <div
+                    className={`rounded-xl p-2 ${
+                      sos.is_resolved
+                        ? "bg-slate-100 text-slate-500"
+                        : "bg-red-100 text-red-600"
+                    }`}
+                  >
+                    {sos.is_resolved ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      <Siren className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-800">
                       {sos.guard_name}
                     </p>
-                    <p className="text-xs text-gray-600 mt-0.5">
+                    <p className="mt-0.5 text-sm text-slate-600">
                       {sos.message}
                     </p>
                     <p
-                      className="text-xs text-gray-400 mt-1"
+                      className="mt-1 text-xs text-slate-400"
                       suppressHydrationWarning
                     >
                       {formatDateTime(sos.created_at)}
@@ -499,7 +617,7 @@ export default function DashboardPage() {
                   {!sos.is_resolved && (
                     <button
                       onClick={() => resolvesSos(sos.id)}
-                      className="bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-green-700 shrink-0"
+                      className="shrink-0 rounded-lg bg-green-700 px-3 text-xs font-semibold text-white hover:bg-green-800"
                     >
                       Selesai
                     </button>
@@ -507,41 +625,46 @@ export default function DashboardPage() {
                 </div>
               ))}
               {sosAlerts.length === 0 && (
-                <p className="text-center text-gray-400 py-8 text-sm">
-                  Tidak ada alert SOS
-                </p>
+                <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center">
+                  <Siren className="mb-3 h-8 w-8 text-slate-300" />
+                  <p className="font-medium text-slate-500">
+                    Tidak ada alert SOS
+                  </p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Semua laporan darurat akan tampil di panel ini.
+                  </p>
+                </div>
               )}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Mobile nav */}
-        <div className="md:hidden grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:hidden">
           <Link
             href="/dashboard/checkpoints"
-            className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-2 shadow-sm"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
           >
-            <span className="text-xl">📍</span>
-            <span className="text-sm font-medium text-gray-700">
+            <MapPin className="h-5 w-5 text-green-700" />
+            <span className="text-sm font-medium text-slate-700">
               Checkpoint
             </span>
           </Link>
           <Link
             href="/dashboard/guards"
-            className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-2 shadow-sm"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
           >
-            <span className="text-xl">👮</span>
-            <span className="text-sm font-medium text-gray-700">Satpam</span>
+            <UsersRound className="h-5 w-5 text-blue-700" />
+            <span className="text-sm font-medium text-slate-700">Satpam</span>
           </Link>
         </div>
       </main>
 
-      {/* Modal Ganti PIN */}
       {showPinModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">
-              🔑 Ganti PIN
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-800">
+              <KeyRound className="h-5 w-5 text-green-700" />
+              Ganti PIN
             </h3>
             <div className="space-y-3">
               {[
@@ -550,7 +673,7 @@ export default function DashboardPage() {
                 { label: "Konfirmasi PIN Baru", key: "confirmPin" },
               ].map(({ label, key }) => (
                 <div key={key}>
-                  <label className="block text-sm text-gray-600 mb-1">
+                  <label className="mb-1 block text-sm text-slate-600">
                     {label}
                   </label>
                   <input
@@ -564,34 +687,38 @@ export default function DashboardPage() {
                         [key]: e.target.value.replace(/\D/g, ""),
                       })
                     }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tracking-widest"
-                    placeholder="······"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="......"
                   />
                 </div>
               ))}
               {pinMsg && (
                 <p
-                  className={`text-sm font-medium ${pinMsg.startsWith("✅") ? "text-green-600" : "text-red-600"}`}
+                  className={`text-sm font-medium ${
+                    pinMsg.includes("berhasil")
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
                 >
                   {pinMsg}
                 </p>
               )}
             </div>
-            <div className="flex gap-2 mt-5">
+            <div className="mt-5 flex gap-2">
               <button
                 onClick={() => {
                   setShowPinModal(false);
                   setPinForm({ oldPin: "", newPin: "", confirmPin: "" });
                   setPinMsg("");
                 }}
-                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm hover:bg-gray-50"
+                className="flex-1 rounded-lg border border-slate-300 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
               >
                 Batal
               </button>
               <button
                 onClick={handleChangePin}
                 disabled={pinLoading}
-                className="flex-1 bg-green-700 text-white py-2.5 rounded-lg text-sm hover:bg-green-800 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-green-700 py-2.5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
               >
                 {pinLoading ? "Menyimpan..." : "Simpan"}
               </button>
