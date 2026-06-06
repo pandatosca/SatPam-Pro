@@ -68,7 +68,26 @@ export async function DELETE(request: Request) {
   const { id } = await request.json();
   if (!id) return Response.json({ error: "ID wajib diisi" }, { status: 400 });
 
-  // Soft delete agar history patroli tidak rusak
   await sql`UPDATE users SET is_active = false WHERE id = ${id} AND role != 'admin'`;
+  return Response.json({ ok: true });
+}
+
+export async function PATCH(request: Request) {
+  const session = await getSession(request);
+  if (!session)
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { oldPin, newPin } = await request.json();
+  if (!/^\d{6}$/.test(newPin))
+    return Response.json(
+      { error: "PIN baru harus 6 digit angka" },
+      { status: 400 },
+    );
+
+  const rows = await sql`SELECT pin FROM users WHERE id = ${session.user_id}`;
+  if (!rows.length || rows[0].pin !== oldPin)
+    return Response.json({ error: "PIN lama tidak cocok" }, { status: 400 });
+
+  await sql`UPDATE users SET pin = ${newPin} WHERE id = ${session.user_id}`;
   return Response.json({ ok: true });
 }
