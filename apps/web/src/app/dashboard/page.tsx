@@ -237,11 +237,21 @@ export default function DashboardPage() {
       <header className="bg-green-800 text-white shadow-lg sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🛡️</span>
-            <div>
-              <h1 className="text-base font-bold leading-tight">SatPam Pro</h1>
-              <p className="text-green-300 text-xs">Dashboard Admin</p>
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-medium leading-tight">{user?.name}</p>
             </div>
+            <button
+              onClick={() => setShowPinModal(true)}
+              className="bg-green-700 hover:bg-green-600 text-white text-xs px-2.5 py-1.5 rounded-lg border border-green-600"
+            >
+              🔑 PIN
+            </button>
+            <button
+              onClick={logout}
+              className="text-green-300 hover:text-white text-xs whitespace-nowrap"
+            >
+              Keluar
+            </button>
           </div>
           <div className="flex items-center gap-2">
             {pendingSos.length > 0 && (
