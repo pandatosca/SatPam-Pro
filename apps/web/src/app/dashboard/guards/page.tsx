@@ -3,6 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  ArrowLeft,
+  KeyRound,
+  LogOut,
+  Plus,
+  ShieldCheck,
+  UsersRound,
+  Pencil,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  ShieldAlert,
+} from "lucide-react";
 
 interface Guard {
   id: number;
@@ -148,36 +161,42 @@ export default function GuardsPage() {
     router.push("/");
   };
 
+  const activeGuards = guards.filter((g) => g.is_active && g.role !== "admin");
+  const adminUsers = guards.filter((g) => g.role === "admin");
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-green-600 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-500 text-lg">Memuat data...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-600 border-t-transparent mx-auto mb-3" />
+          <p className="text-slate-500">Memuat data...</p>
         </div>
       </div>
     );
   }
 
-  const activeGuards = guards.filter((g) => g.is_active && g.role !== "admin");
-  const adminUsers = guards.filter((g) => g.role === "admin");
-
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-green-800 text-white shadow-lg">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      {/* Header — konsisten dengan dashboard */}
+      <header className="sticky top-0 z-10 border-b border-green-700 bg-green-800 text-white shadow-sm">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="text-green-200 hover:text-white text-base font-medium transition-colors"
-            >
-              ← Dashboard
-            </Link>
-            <span className="text-green-500">/</span>
-            <h1 className="text-xl font-bold">Kelola Satpam</h1>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
+              <ShieldCheck className="h-6 w-6 text-emerald-100" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard"
+                className="text-green-300 hover:text-white text-sm font-medium flex items-center gap-1"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Dashboard
+              </Link>
+              <span className="text-green-600">/</span>
+              <h1 className="text-base font-bold">Kelola Satpam</h1>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 setForm(emptyForm);
@@ -185,70 +204,88 @@ export default function GuardsPage() {
                 setShowForm(true);
                 setError("");
               }}
-              className="bg-green-600 hover:bg-green-500 text-white text-base font-semibold px-5 py-2.5 rounded-lg transition-all"
+              className="inline-flex items-center gap-2 rounded-lg bg-green-600 hover:bg-green-500 px-3 py-2 text-sm font-semibold text-white"
             >
-              + Tambah Satpam
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Tambah Satpam</span>
+              <span className="sm:hidden">Tambah</span>
             </button>
             <button
               onClick={logout}
-              className="text-green-300 hover:text-white text-sm"
+              className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/15"
             >
-              Keluar
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Keluar</span>
             </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="mx-auto max-w-6xl px-4 py-6 space-y-5">
         {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {[
             {
               label: "Satpam Aktif",
               value: activeGuards.length,
-              color: "text-green-700",
-              bg: "bg-green-50",
-              border: "border-green-100",
+              color: "text-emerald-700",
+              bg: "bg-emerald-50",
+              border: "border-emerald-100",
+              icon: UsersRound,
             },
             {
               label: "Admin",
               value: adminUsers.length,
-              color: "text-purple-700",
-              bg: "bg-purple-50",
-              border: "border-purple-100",
+              color: "text-violet-700",
+              bg: "bg-violet-50",
+              border: "border-violet-100",
+              icon: ShieldAlert,
             },
             {
               label: "Total Akun",
               value: guards.length,
-              color: "text-gray-700",
-              bg: "bg-gray-50",
-              border: "border-gray-100",
+              color: "text-slate-700",
+              bg: "bg-slate-50",
+              border: "border-slate-100",
+              icon: KeyRound,
             },
-          ].map((c) => (
-            <div
-              key={c.label}
-              className={`${c.bg} rounded-xl p-5 border ${c.border} shadow-sm`}
-            >
-              <p className="text-sm text-gray-500 font-medium mb-1">
-                {c.label}
-              </p>
-              <p className={`text-4xl font-bold ${c.color}`}>{c.value}</p>
-            </div>
-          ))}
+          ].map((c) => {
+            const Icon = c.icon;
+            return (
+              <div
+                key={c.label}
+                className={`${c.bg} rounded-2xl border ${c.border} p-4 shadow-sm`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">
+                      {c.label}
+                    </p>
+                    <p className={`mt-2 text-3xl font-bold ${c.color}`}>
+                      {c.value}
+                    </p>
+                  </div>
+                  <div className={`rounded-xl p-2 ${c.bg}`}>
+                    <Icon className={`h-5 w-5 ${c.color}`} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Form */}
         {showForm && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-5">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <h2 className="text-lg font-bold text-slate-800 mb-4">
               {editId ? "✏️ Edit Satpam" : "➕ Tambah Satpam Baru"}
             </h2>
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-5 text-base">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
                 ⚠️ {error}
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 {
                   label: "Nama Lengkap *",
@@ -257,14 +294,14 @@ export default function GuardsPage() {
                 },
                 { label: "Username *", key: "username", placeholder: "budi" },
                 {
-                  label: `PIN (6 Digit)${editId ? " - kosongkan jika tidak diubah" : " *"}`,
+                  label: `PIN (6 Digit)${editId ? " — kosongkan jika tidak diubah" : " *"}`,
                   key: "pin",
                   placeholder: "123456",
                 },
                 { label: "No. HP", key: "phone", placeholder: "08123456789" },
               ].map(({ label, key, placeholder }) => (
                 <div key={key}>
-                  <label className="text-sm text-gray-700 font-semibold block mb-1.5">
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">
                     {label}
                   </label>
                   <input
@@ -277,16 +314,16 @@ export default function GuardsPage() {
                       setForm({ ...form, [key]: val });
                     }}
                     placeholder={placeholder}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
               ))}
             </div>
-            <div className="flex gap-3 mt-6 pt-5 border-t border-gray-100">
+            <div className="flex gap-2 mt-5 pt-4 border-t border-slate-100">
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-base font-semibold px-6 py-3 rounded-lg transition-all"
+                className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg"
               >
                 {saving ? "Menyimpan..." : "💾 Simpan"}
               </button>
@@ -297,7 +334,7 @@ export default function GuardsPage() {
                   setForm(emptyForm);
                   setError("");
                 }}
-                className="border border-gray-300 text-gray-700 hover:bg-gray-50 text-base px-6 py-3 rounded-lg transition-all"
+                className="border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm px-5 py-2.5 rounded-lg"
               >
                 Batal
               </button>
@@ -307,12 +344,13 @@ export default function GuardsPage() {
 
         {/* List */}
         <div className="space-y-3">
-          <h2 className="text-lg font-bold text-gray-800">
+          <h2 className="text-base font-bold text-slate-700">
             Daftar Satpam ({activeGuards.length} Aktif)
           </h2>
           {guards.length === 0 ? (
-            <div className="bg-white rounded-xl p-12 text-center border border-dashed border-gray-300">
-              <p className="text-gray-500 text-base">
+            <div className="bg-white rounded-2xl p-12 text-center border border-dashed border-slate-200">
+              <UsersRound className="mx-auto h-10 w-10 text-slate-300 mb-3" />
+              <p className="text-slate-500">
                 Belum ada satpam. Klik "Tambah Satpam" untuk mulai.
               </p>
             </div>
@@ -321,38 +359,38 @@ export default function GuardsPage() {
               {guards.map((g) => (
                 <div
                   key={g.id}
-                  className={`bg-white rounded-xl shadow-sm border p-5 transition-all hover:shadow-md ${g.is_active ? "border-gray-200" : "border-gray-100 opacity-60"}`}
+                  className={`bg-white rounded-2xl border p-4 shadow-sm transition-all hover:shadow-md ${g.is_active ? "border-slate-200" : "border-slate-100 opacity-60"}`}
                 >
                   <div className="flex items-center gap-4">
                     <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold shrink-0 ${g.role === "admin" ? "bg-purple-600" : "bg-green-600"}`}
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center text-white text-base font-bold shrink-0 ${g.role === "admin" ? "bg-violet-600" : "bg-green-600"}`}
                     >
                       {g.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-bold text-gray-800 text-base">
+                        <p className="font-semibold text-slate-800 text-sm">
                           {g.name}
-                        </h3>
+                        </p>
                         <span
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${g.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-green-100 text-green-700"}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${g.role === "admin" ? "bg-violet-100 text-violet-700" : "bg-green-100 text-green-700"}`}
                         >
                           {g.role === "admin" ? "Admin" : "Satpam"}
                         </span>
                         <span
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${g.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${g.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
                         >
                           {g.is_active ? "Aktif" : "Nonaktif"}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-3 text-sm text-gray-500">
+                      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
                         <span>@{g.username}</span>
                         {g.phone && <span>📱 {g.phone}</span>}
                         {g.pin && <span>🔑 PIN: {g.pin}</span>}
                       </div>
                     </div>
                     {g.role !== "admin" && (
-                      <div className="flex gap-2 shrink-0">
+                      <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
                         <button
                           onClick={() => {
                             setForm({
@@ -366,21 +404,26 @@ export default function GuardsPage() {
                             setShowForm(true);
                             setError("");
                           }}
-                          className="text-sm bg-yellow-50 text-yellow-700 hover:bg-yellow-100 px-3 py-2 rounded-lg font-medium transition-colors"
+                          className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded-lg font-medium"
                         >
-                          ✏️ Edit
+                          <Pencil className="h-3 w-3" /> Edit
                         </button>
                         <button
                           onClick={() => toggleActive(g)}
-                          className={`text-sm px-3 py-2 rounded-lg font-medium transition-colors ${g.is_active ? "bg-orange-50 text-orange-700 hover:bg-orange-100" : "bg-green-50 text-green-700 hover:bg-green-100"}`}
+                          className={`inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium ${g.is_active ? "bg-orange-50 text-orange-700 hover:bg-orange-100" : "bg-green-50 text-green-700 hover:bg-green-100"}`}
                         >
+                          {g.is_active ? (
+                            <ToggleLeft className="h-3 w-3" />
+                          ) : (
+                            <ToggleRight className="h-3 w-3" />
+                          )}
                           {g.is_active ? "Nonaktifkan" : "Aktifkan"}
                         </button>
                         <button
                           onClick={() => deleteGuard(g)}
-                          className="text-sm bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-lg font-medium transition-colors"
+                          className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded-lg font-medium"
                         >
-                          🗑️ Hapus
+                          <Trash2 className="h-3 w-3" /> Hapus
                         </button>
                       </div>
                     )}
