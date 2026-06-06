@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getUser, getToken, logout } from "@/app/api/utils/auth-helper";
 
 interface Guard {
   id: number;
@@ -15,13 +14,18 @@ interface Guard {
   is_active: boolean;
 }
 
-const emptyForm = {
-  name: "",
-  username: "",
-  pin: "",
-  phone: "",
-  role: "guard",
-};
+const emptyForm = { name: "", username: "", pin: "", phone: "", role: "guard" };
+
+function getToken() {
+  return typeof window !== "undefined"
+    ? localStorage.getItem("patrol_token") || ""
+    : "";
+}
+function getUser() {
+  if (typeof window === "undefined") return null;
+  const u = localStorage.getItem("patrol_user");
+  return u ? JSON.parse(u) : null;
+}
 
 export default function GuardsPage() {
   const router = useRouter();
@@ -62,7 +66,6 @@ export default function GuardsPage() {
 
   const handleSave = async () => {
     setError("");
-
     if (!form.name || !form.username) {
       setError("Nama dan username wajib diisi");
       return;
@@ -75,7 +78,6 @@ export default function GuardsPage() {
       setError("PIN harus 6 digit angka");
       return;
     }
-
     setSaving(true);
     try {
       const res = await fetch("/api/patrol/guards", {
@@ -86,7 +88,6 @@ export default function GuardsPage() {
         },
         body: JSON.stringify(editId ? { id: editId, ...form } : form),
       });
-
       if (res.ok) {
         setShowForm(false);
         setForm(emptyForm);
@@ -141,11 +142,10 @@ export default function GuardsPage() {
     }
   };
 
-  const handleLogout = () => {
-    if (confirm("Yakin ingin logout?")) {
-      logout();
-      router.push("/");
-    }
+  const logout = () => {
+    localStorage.removeItem("patrol_token");
+    localStorage.removeItem("patrol_user");
+    router.push("/");
   };
 
   if (loading) {
@@ -164,183 +164,131 @@ export default function GuardsPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header - Rapi & Konsisten */}
-      <header className="bg-linear-to-r from-green-900 to-green-800 text-white shadow-lg print:hidden">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboard"
-                className="text-green-200 hover:text-white text-lg font-medium transition-colors"
-              >
-                ← Dashboard
-              </Link>
-              <span className="text-green-400 text-xl">/</span>
-              <h1 className="text-2xl font-bold text-white">Kelola Satpam</h1>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 hover:bg-red-700 text-white text-base font-semibold px-6 py-3 rounded-lg shadow-md transition-all flex items-center gap-2"
-              >
-                <span>🚪</span>
-                <span>Logout</span>
-              </button>
-              <button
-                onClick={() => {
-                  setForm(emptyForm);
-                  setEditId(null);
-                  setShowForm(true);
-                  setError("");
-                }}
-                className="bg-green-600 hover:bg-green-500 text-white text-base font-semibold px-6 py-3 rounded-lg shadow-md transition-all flex items-center gap-2"
-              >
-                <span>+</span>
-                <span>Tambah Satpam</span>
-              </button>
-            </div>
+      {/* Header */}
+      <header className="bg-green-800 text-white shadow-lg">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard"
+              className="text-green-200 hover:text-white text-base font-medium transition-colors"
+            >
+              ← Dashboard
+            </Link>
+            <span className="text-green-500">/</span>
+            <h1 className="text-xl font-bold">Kelola Satpam</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setForm(emptyForm);
+                setEditId(null);
+                setShowForm(true);
+                setError("");
+              }}
+              className="bg-green-600 hover:bg-green-500 text-white text-base font-semibold px-5 py-2.5 rounded-lg transition-all"
+            >
+              + Tambah Satpam
+            </button>
+            <button
+              onClick={logout}
+              className="text-green-300 hover:text-white text-sm"
+            >
+              Keluar
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl p-6 shadow-md border-2 border-green-100">
-            <div className="flex items-center gap-4">
-              <div className="bg-green-100 text-green-700 w-14 h-14 rounded-full flex items-center justify-center text-2xl">
-                👮
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 font-medium">
-                  Total Satpam Aktif
-                </p>
-                <p className="text-3xl font-bold text-gray-800">
-                  {activeGuards.length}
-                </p>
-              </div>
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            {
+              label: "Satpam Aktif",
+              value: activeGuards.length,
+              color: "text-green-700",
+              bg: "bg-green-50",
+              border: "border-green-100",
+            },
+            {
+              label: "Admin",
+              value: adminUsers.length,
+              color: "text-purple-700",
+              bg: "bg-purple-50",
+              border: "border-purple-100",
+            },
+            {
+              label: "Total Akun",
+              value: guards.length,
+              color: "text-gray-700",
+              bg: "bg-gray-50",
+              border: "border-gray-100",
+            },
+          ].map((c) => (
+            <div
+              key={c.label}
+              className={`${c.bg} rounded-xl p-5 border ${c.border} shadow-sm`}
+            >
+              <p className="text-sm text-gray-500 font-medium mb-1">
+                {c.label}
+              </p>
+              <p className={`text-4xl font-bold ${c.color}`}>{c.value}</p>
             </div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-md border-2 border-purple-100">
-            <div className="flex items-center gap-4">
-              <div className="bg-purple-100 text-purple-700 w-14 h-14 rounded-full flex items-center justify-center text-2xl">
-                👑
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 font-medium">Admin</p>
-                <p className="text-3xl font-bold text-gray-800">
-                  {adminUsers.length}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-md border-2 border-gray-100">
-            <div className="flex items-center gap-4">
-              <div className="bg-gray-100 text-gray-700 w-14 h-14 rounded-full flex items-center justify-center text-2xl">
-                📊
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 font-medium">Total Akun</p>
-                <p className="text-3xl font-bold text-gray-800">
-                  {guards.length}
-                </p>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Form */}
         {showForm && (
-          <div className="bg-white rounded-xl shadow-lg border-2 border-green-200 p-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-              <span className="bg-green-100 text-green-700 w-10 h-10 rounded-full flex items-center justify-center text-lg">
-                {editId ? "✏️" : "+"}
-              </span>
-              {editId ? "Edit Satpam" : "Tambah Satpam Baru"}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-5">
+              {editId ? "✏️ Edit Satpam" : "➕ Tambah Satpam Baru"}
             </h2>
-
             {error && (
-              <div className="bg-red-50 border-2 border-red-300 text-red-700 px-5 py-4 rounded-lg mb-6 text-base font-medium flex items-center gap-2">
-                <span>️</span>
-                <span>{error}</span>
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-5 text-base">
+                ⚠️ {error}
               </div>
             )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="text-base text-gray-700 font-semibold block mb-2">
-                  Nama Lengkap <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Contoh: Budi Santoso"
-                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-base text-gray-700 font-semibold block mb-2">
-                  Username <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={form.username}
-                  onChange={(e) =>
-                    setForm({ ...form, username: e.target.value.toLowerCase() })
-                  }
-                  placeholder="Contoh: budi"
-                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-base text-gray-700 font-semibold block mb-2">
-                  PIN (6 Digit){" "}
-                  {editId ? (
-                    "(Kosongkan jika tidak diubah)"
-                  ) : (
-                    <span className="text-red-500">*</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  value={form.pin}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      pin: e.target.value.replace(/\D/g, "").slice(0, 6),
-                    })
-                  }
-                  placeholder="123456"
-                  maxLength={6}
-                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base font-mono font-bold text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  💡 PIN digunakan untuk login cepat di HP
-                </p>
-              </div>
-
-              <div>
-                <label className="text-base text-gray-700 font-semibold block mb-2">
-                  No. HP
-                </label>
-                <input
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="08123456789"
-                  className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {[
+                {
+                  label: "Nama Lengkap *",
+                  key: "name",
+                  placeholder: "Budi Santoso",
+                },
+                { label: "Username *", key: "username", placeholder: "budi" },
+                {
+                  label: `PIN (6 Digit)${editId ? " - kosongkan jika tidak diubah" : " *"}`,
+                  key: "pin",
+                  placeholder: "123456",
+                },
+                { label: "No. HP", key: "phone", placeholder: "08123456789" },
+              ].map(({ label, key, placeholder }) => (
+                <div key={key}>
+                  <label className="text-sm text-gray-700 font-semibold block mb-1.5">
+                    {label}
+                  </label>
+                  <input
+                    value={form[key as keyof typeof form]}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (key === "username") val = val.toLowerCase();
+                      if (key === "pin")
+                        val = val.replace(/\D/g, "").slice(0, 6);
+                      setForm({ ...form, [key]: val });
+                    }}
+                    placeholder={placeholder}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              ))}
             </div>
-
-            <div className="flex gap-3 mt-8 pt-6 border-t-2 border-gray-200">
+            <div className="flex gap-3 mt-6 pt-5 border-t border-gray-100">
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-lg font-semibold px-8 py-4 rounded-lg shadow-lg transition-all flex items-center gap-2"
+                className="bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-base font-semibold px-6 py-3 rounded-lg transition-all"
               >
-                <span>{saving ? "⏳" : "💾"}</span>
-                <span>{saving ? "Menyimpan..." : "Simpan"}</span>
+                {saving ? "Menyimpan..." : "💾 Simpan"}
               </button>
               <button
                 onClick={() => {
@@ -349,7 +297,7 @@ export default function GuardsPage() {
                   setForm(emptyForm);
                   setError("");
                 }}
-                className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 text-lg font-semibold px-8 py-4 rounded-lg transition-all"
+                className="border border-gray-300 text-gray-700 hover:bg-gray-50 text-base px-6 py-3 rounded-lg transition-all"
               >
                 Batal
               </button>
@@ -357,90 +305,52 @@ export default function GuardsPage() {
           </div>
         )}
 
-        {/* List Satpam */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <span className="bg-green-100 text-green-700 w-8 h-8 rounded-full flex items-center justify-center">
-              👮
-            </span>
+        {/* List */}
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold text-gray-800">
             Daftar Satpam ({activeGuards.length} Aktif)
           </h2>
-
           {guards.length === 0 ? (
-            <div className="bg-white rounded-xl p-12 text-center border-2 border-dashed border-gray-300">
-              <div className="text-7xl mb-4"></div>
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                Belum Ada Satpam
-              </h3>
-              <p className="text-gray-500 mb-6">
-                Klik tombol "Tambah Satpam" di atas untuk membuat akun pertama
+            <div className="bg-white rounded-xl p-12 text-center border border-dashed border-gray-300">
+              <p className="text-gray-500 text-base">
+                Belum ada satpam. Klik "Tambah Satpam" untuk mulai.
               </p>
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-3">
               {guards.map((g) => (
                 <div
                   key={g.id}
-                  className={`bg-white rounded-xl shadow-md border-2 p-6 transition-all hover:shadow-lg ${
-                    g.is_active
-                      ? "border-green-200"
-                      : "border-gray-200 opacity-60"
-                  }`}
+                  className={`bg-white rounded-xl shadow-sm border p-5 transition-all hover:shadow-md ${g.is_active ? "border-gray-200" : "border-gray-100 opacity-60"}`}
                 >
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4">
                     <div
-                      className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold shrink-0 shadow-md ${
-                        g.role === "admin" ? "bg-purple-600" : "bg-green-600"
-                      }`}
+                      className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold shrink-0 ${g.role === "admin" ? "bg-purple-600" : "bg-green-600"}`}
                     >
                       {g.name.charAt(0).toUpperCase()}
                     </div>
-
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap mb-2">
-                        <h3 className="font-bold text-gray-800 text-xl">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h3 className="font-bold text-gray-800 text-base">
                           {g.name}
                         </h3>
                         <span
-                          className={`text-sm px-3 py-1 rounded-full font-semibold ${
-                            g.role === "admin"
-                              ? "bg-purple-100 text-purple-700"
-                              : "bg-green-100 text-green-700"
-                          }`}
+                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${g.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-green-100 text-green-700"}`}
                         >
-                          {g.role === "admin" ? "👑 Admin" : "👮 Satpam"}
+                          {g.role === "admin" ? "Admin" : "Satpam"}
                         </span>
                         <span
-                          className={`text-sm px-3 py-1 rounded-full font-semibold ${
-                            g.is_active
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-500"
-                          }`}
+                          className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${g.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
                         >
-                          {g.is_active ? "✓ Aktif" : "✗ Nonaktif"}
+                          {g.is_active ? "Aktif" : "Nonaktif"}
                         </span>
                       </div>
-
-                      <div className="flex flex-wrap items-center gap-4 text-sm">
-                        <span className="text-gray-600 flex items-center gap-1">
-                          <span>👤</span>
-                          <span className="font-mono">@{g.username}</span>
-                        </span>
-                        {g.phone && (
-                          <span className="text-gray-600 flex items-center gap-1">
-                            <span>📞</span>
-                            <span>{g.phone}</span>
-                          </span>
-                        )}
-                        {g.pin && (
-                          <span className="text-gray-600 flex items-center gap-1">
-                            <span>🔐</span>
-                            <span className="font-mono">PIN: {g.pin}</span>
-                          </span>
-                        )}
+                      <div className="flex flex-wrap gap-3 text-sm text-gray-500">
+                        <span>@{g.username}</span>
+                        {g.phone && <span>📱 {g.phone}</span>}
+                        {g.pin && <span>🔑 PIN: {g.pin}</span>}
                       </div>
                     </div>
-
                     {g.role !== "admin" && (
                       <div className="flex gap-2 shrink-0">
                         <button
@@ -456,30 +366,21 @@ export default function GuardsPage() {
                             setShowForm(true);
                             setError("");
                           }}
-                          className="text-base bg-yellow-50 text-yellow-700 hover:bg-yellow-100 px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-1"
+                          className="text-sm bg-yellow-50 text-yellow-700 hover:bg-yellow-100 px-3 py-2 rounded-lg font-medium transition-colors"
                         >
-                          <span>✏️</span>
-                          <span>Edit</span>
+                          ✏️ Edit
                         </button>
                         <button
                           onClick={() => toggleActive(g)}
-                          className={`text-base px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-1 ${
-                            g.is_active
-                              ? "bg-orange-50 text-orange-700 hover:bg-orange-100"
-                              : "bg-green-50 text-green-700 hover:bg-green-100"
-                          }`}
+                          className={`text-sm px-3 py-2 rounded-lg font-medium transition-colors ${g.is_active ? "bg-orange-50 text-orange-700 hover:bg-orange-100" : "bg-green-50 text-green-700 hover:bg-green-100"}`}
                         >
-                          <span>{g.is_active ? "⏸" : "▶"}</span>
-                          <span>
-                            {g.is_active ? "Nonaktifkan" : "Aktifkan"}
-                          </span>
+                          {g.is_active ? "Nonaktifkan" : "Aktifkan"}
                         </button>
                         <button
                           onClick={() => deleteGuard(g)}
-                          className="text-base bg-red-50 text-red-700 hover:bg-red-100 px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-1"
+                          className="text-sm bg-red-50 text-red-700 hover:bg-red-100 px-3 py-2 rounded-lg font-medium transition-colors"
                         >
-                          <span>🗑️</span>
-                          <span>Hapus</span>
+                          🗑️ Hapus
                         </button>
                       </div>
                     )}
